@@ -1,0 +1,15 @@
+[botdetection.ip_limit]
+# activate link_token method in the ip_limit method
+link_token = true
+# GET request limit per IP
+filter_link_local = false
+
+[botdetection.ip_lists]
+pass_searxng_org = true
+pass_ip = [
+    "172.20.0.0/16",    # wmm-network
+    "172.19.0.0/16",    # tailscale-net
+    "127.0.0.0/8",      # localhost
+    "10.0.0.0/8",       # private
+    "192.168.0.0/16",   # private
+] 

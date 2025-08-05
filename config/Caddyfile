@@ -1,0 +1,189 @@
+{
+	email admin@web-marketing-manager.com
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
+
+	log {
+		output file /var/log/caddy/access.log
+		format json
+		level DEBUG
+	}
+
+	# Configurazione TrueNAS/TrueNAS Scale
+	servers {
+		trusted_proxies 172.20.0.0/16 10.0.0.0/8 192.168.0.0/16
+	}
+}
+
+n8n.web-marketing-manager.com {
+	# ==== LOGGING ====
+	log {
+		output file /var/log/caddy/n8n.log {
+			roll_size 20MB
+			roll_keep 5
+		}
+		format json
+		level DEBUG
+	}
+
+	# ==== TRUENAS WEB UI ====
+	handle_path /truenas/* {
+		reverse_proxy https://TRUENAS_IP_ADDRESS:443 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto https
+			
+			# Per TrueNAS Scale - ignora certificati self-signed
+			transport http {
+				tls_insecure_skip_verify
+				dial_timeout 30s
+				response_header_timeout 120s
+			}
+			
+			# Health check per TrueNAS
+			health_uri /
+			health_interval 60s
+			health_timeout 15s
+		}
+	}
+
+	# ==== PGADMIN ====
+	redir /pgadmin /pgadmin/ 301
+	handle_path /pgadmin/* {
+		reverse_proxy pgadmin:80 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Script-Name /pgadmin
+			header_up X-Forwarded-Prefix /pgadmin
+
+			transport http {
+				dial_timeout 30s
+				response_header_timeout 120s
+			}
+
+			health_uri /misc/ping
+			health_interval 30s
+			health_timeout 10s
+
+			lb_policy first
+			lb_try_duration 5s
+		}
+	}
+
+	# ==== WEBSOCKET MATCHER ====
+	@websocket {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+
+	# ==== TEST DI DEBUG ====
+	@test path /test
+	respond @test "Caddy is working!" 200
+
+	# ==== N8N ROOT PATH ====
+	handle_path /* {
+		reverse_proxy wmm_n8n:5678 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+
+			transport http {
+				dial_timeout 15s
+				response_header_timeout 45s
+			}
+
+			health_uri /healthz
+			health_interval 10s
+			health_timeout 5s
+
+			lb_policy first
+			lb_try_duration 10s
+		}
+	}
+
+	# ==== WEBSOCKET HANDLING ====
+	handle @websocket {
+		reverse_proxy wmm_n8n:5678 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 30s
+				response_header_timeout 60s
+			}
+		}
+	}
+
+	# ==== HEADERS ====
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' ws: wss:; frame-ancestors 'self';"
+		Access-Control-Allow-Origin "*"
+		Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+		Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-N8N-API-KEY"
+		Access-Control-Allow-Credentials "true"
+		-Server
+	}
+
+	# ==== COMPRESSION ====
+	encode gzip zstd
+
+	# ==== ERROR HANDLING ====
+	handle_errors {
+		@502 expression {http.error.status_code} == 502
+		handle @502 {
+			respond "Bad Gateway: The n8n service (wmm_n8n:5678) is not reachable. Please check if the container is running." 502
+		}
+
+		@503 expression {http.error.status_code} == 503
+		handle @503 {
+			respond "Service Unavailable: The backend service is temporarily unavailable." 503
+		}
+
+		respond "Error {http.error.status_code}: {http.error.status_text}" {http.error.status_code}
+	}
+}
+
+# Redirect www to non-www
+www.n8n.web-marketing-manager.com {
+	redir https://n8n.web-marketing-manager.com{uri} 301
+}
+
+# ==== TRUENAS DEDICATO ====
+truenas.web-marketing-manager.com {
+	log {
+		output file /var/log/caddy/truenas.log {
+			roll_size 20MB
+			roll_keep 5
+		}
+		format json
+		level DEBUG
+	}
+
+	reverse_proxy https://TRUENAS_IP_ADDRESS:443 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto https
+		
+		# Per TrueNAS Scale
+		transport http {
+			tls_insecure_skip_verify  # Ignora certificati self-signed
+			dial_timeout 30s
+			response_header_timeout 120s
+		}
+	}
+
+	# Headers di sicurezza per TrueNAS
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Access-Control-Allow-Origin "*"
+		-Server
+	}
+
+	encode gzip
+}

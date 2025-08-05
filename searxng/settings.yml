@@ -1,0 +1,68 @@
+# SearXNG Settings per WMM - Configurazione ottimizzata con Brave
+use_default_settings: true
+
+general:
+  instance_name: "WMM Search"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+
+search:
+  default_lang: "it-IT"
+  formats:
+    - html
+    - json
+  safe_search: 0
+  autocomplete: ""
+
+server:
+  secret_key: "81eb4fd3aaaaee5b647fbd5cb5e1630c086c2b92cfae0ee5ddf2f0555bd6b6f0"
+
+# Configurazione conservativa per ridurre rate limiting
+outgoing:
+  request_timeout: 25.0
+  useragent_suffix: ""
+  using_tor_proxy: false
+  extra_proxy_timeout: 25
+  useragent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  max_ban_time_on_fail: 7200
+  pool_connections: 2
+  pool_maxsize: 4
+  max_request_timeout: 40.0
+
+# Disabilita motori problematici (mantenendo Brave)
+disabled_engines:
+  - wikipedia
+  - stackoverflow  
+  - qwant
+  - yandex
+  - brave
+  - duckduckgo
+  
+
+# Configurazione specifica per Brave anti-rate-limiting
+engines:
+  - name: brave
+    engine: brave
+    shortcut: br
+    timeout: 40.0
+    categories: [general]
+    disabled: false
+    # Limita richieste per ridurre rate limiting
+    max_page: 1
+    # Headers realistici per sembrare un browser normale
+    headers:
+      User-Agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+      Accept-Language: "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
+      Accept-Encoding: "gzip, deflate, br"
+      Sec-Ch-Ua: '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"'
+      Sec-Ch-Ua-Mobile: "?0"
+      Sec-Ch-Ua-Platform: '"macOS"'
+      Sec-Fetch-Dest: "document"
+      Sec-Fetch-Mode: "navigate"
+      Sec-Fetch-Site: "none"
+      Sec-Fetch-User: "?1"
+      Upgrade-Insecure-Requests: "1"
+      Cache-Control: "max-age=0"
+      Referer: "https://brave.com/"
